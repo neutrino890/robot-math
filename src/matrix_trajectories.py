@@ -88,18 +88,18 @@ class Case:
 def definiteness(A: np.ndarray) -> str:
     """用特征值符号给（对称）矩阵定性。"""
     if not np.allclose(A, A.T, atol=1e-12):
-        return "非对称（看对称部分）"
+        return "non-symmetric (see symmetric part)"
     w = np.linalg.eigvalsh(A)
     tol = TOL * max(1.0, float(np.abs(w).max()))
     if w.min() > tol:
-        return "正定 PD"
+        return "positive-definite (PD)"
     if w.min() >= -tol:
-        return "半正定 PSD（含零特征值）"
+        return "positive semidefinite (PSD)"
     if w.max() < -tol:
-        return "负定 ND"
+        return "negative-definite (ND)"
     if w.max() <= tol:
-        return "半负定 NSD"
-    return "不定（鞍形）"
+        return "negative semidefinite (NSD)"
+    return "indefinite (saddle)"
 
 
 def analyze(case: Case) -> dict:
@@ -117,19 +117,19 @@ def analyze(case: Case) -> dict:
     # 连续时间 ẋ = Ax：Re λ > 0 发散，= 0 临界，< 0 收敛
     tol_c = 1e-9 * max(1.0, rho)
     if max_re > tol_c:
-        verdict_c = "发散（不稳定）"
+        verdict_c = "diverges (unstable)"
     elif max_re >= -tol_c:
-        verdict_c = "有界（临界）"
+        verdict_c = "bounded (marginal)"
     else:
-        verdict_c = "收敛（稳定）"
+        verdict_c = "converges (stable)"
 
     # 离散时间 x_{k+1} = Ax_k：看 ρ 与 1 的关系
     if rho > 1 + tol_c:
-        verdict_d = "发散"
+        verdict_d = "diverges"
     elif rho >= 1 - tol_c:
-        verdict_d = "有界（临界）"
+        verdict_d = "bounded (marginal)"
     else:
-        verdict_d = "收敛"
+        verdict_d = "converges"
 
     # 自动选时长：让增长因子大约落在 e^4 ≈ 55 倍
     T = case.T if case.T is not None else float(np.clip(4.0 / max(max_re, 1e-6), 0.5, 6.0))
@@ -207,9 +207,9 @@ def plot_spectrum(ax, case: Case) -> None:
     ax.set_xlabel("Re λ")
     ax.set_ylabel("Im λ")
     handles = [
-        Patch(fc="#f7d9d9", ec="none", label="Re λ > 0：连续时间发散"),
-        Patch(fc="#dce9f7", ec="none", label="Re λ < 0：连续时间衰减"),
-        Line2D([], [], ls=":", color="0.2", lw=1.2, label=f"ρ = {rho:.2f}（谱半径）"),
+        Patch(fc="#f7d9d9", ec="none", label="Re λ > 0: diverges"),
+        Patch(fc="#dce9f7", ec="none", label="Re λ < 0: decays"),
+        Line2D([], [], ls=":", color="0.2", lw=1.2, label=f"ρ = {rho:.2f} (spectral radius)"),
     ]
     ax.legend(handles=handles, loc="upper right", fontsize=7.5, framealpha=0.9)
 
@@ -239,29 +239,30 @@ def plot_quadratic(ax, case: Case, X: np.ndarray) -> None:
     ax.contour(Y1, Y2, Q, levels=levels, colors="k", linewidths=0.3, alpha=0.35)
     if qmin < -qtol < qmax:
         ax.contour(Y1, Y2, Q, levels=[0.0], colors="k", linewidths=1.4, linestyles="--")
-        ax.text(0.02, 0.96, r"虚线 = $x^\top A x = 0$", transform=ax.transAxes,
+        ax.text(0.02, 0.96, r"dashed = $x^\top A x = 0$", transform=ax.transAxes,
                 va="top", fontsize=8.5,
                 bbox=dict(fc="white", ec="none", alpha=0.8, boxstyle="round,pad=0.25"))
 
-    ax.plot(Y[:, 0], Y[:, 1], color="#d62728", lw=1.9, label="轨迹投影")
+    ax.plot(Y[:, 0], Y[:, 1], color="#d62728", lw=1.9, label="trajectory projection")
     ax.plot(Y[0, 0], Y[0, 1], "o", color="#2ca02c", ms=8, mec="k", label="x(0)")
     ax.plot(Y[-1, 0], Y[-1, 1], "X", color="#d62728", ms=10, mec="k", label=f"x(T)")
 
     ax.set_xlim(g[0], g[-1])
     ax.set_ylim(g[0], g[-1])
-    ax.set_xlabel(f"沿主轴 e1 (λ_sym={pw[0]:.2f})")
-    ax.set_ylabel(f"沿主轴 e2 (λ_sym={pw[1]:.2f})")
+    ax.set_xlabel(f"along axis e1 (λ_sym={pw[0]:.2f})")
+    ax.set_ylabel(f"along axis e2 (λ_sym={pw[1]:.2f})")
     ax.legend(loc="lower right", fontsize=8.5, framealpha=0.9)
 
 
 def plot_states(ax, case: Case, ts: np.ndarray, X: np.ndarray) -> None:
+    palette = plt.get_cmap("tab20")
     for i in range(X.shape[1]):
-        ax.plot(ts, X[:, i], lw=1.8, label=f"x{i + 1}")
+        ax.plot(ts, X[:, i], color=palette(i), lw=1.8, label=f"x{i + 1}")
     if np.abs(X).max() > 1e3:
         ax.set_yscale("symlog", linthresh=1.0)
     ax.axhline(0, color="0.5", lw=0.8)
     ax.set_xlabel("t")
-    ax.set_ylabel("状态 x(t)")
+    ax.set_ylabel("State x(t)")
     ax.grid(alpha=0.3)
     ax.legend(fontsize=8.5, ncols=2)
 
@@ -274,13 +275,13 @@ def plot_energy(ax, case: Case, ts: np.ndarray, X: np.ndarray) -> None:
 
     ax.plot(ts, V, lw=2.0, color="#6a3d9a", label=r"$V(t) = x^\top A x$")
     ax.plot(ts, v0 * np.exp(-2 * ts), "--", color="0.5", lw=1.3,
-            label=r"参考 $e^{-2t}$（稳定）")
+            label=r"reference $e^{-2t}$ (stable)")
     ax.axhline(0, color="0.45", lw=0.8)
     # 不定矩阵的 V(t) 会穿过 0，用 symlog 才能同时看到 ±和数量级
     ax.set_yscale("symlog", linthresh=max(vmax * 1e-3, 1e-12))
     ax.set_ylim(-3 * vmax, 3 * vmax)
     ax.set_xlabel("t")
-    ax.set_ylabel(r"二次型 $V(t)$")
+    ax.set_ylabel(r"Quadratic form $V(t)$")
     ax.grid(alpha=0.3)
     ax.legend(fontsize=8.5, loc="best")
     ax.text(0.02, 0.03, f"V(0)={v0:.3g}   V(T)={V[-1]:.3g}",
@@ -291,13 +292,13 @@ def plot_energy(ax, case: Case, ts: np.ndarray, X: np.ndarray) -> None:
 def make_cases() -> list[Case]:
     M = build_matrices()
     return [
-        Case("SPD", "① 对称正定 SPD", M["A2"],
+        Case("SPD", "① Symmetric positive-definite (SPD)", M["A2"],
              note="A = QΛQᵀ，λ = {1,2,3} 全正 → 所有方向都发散"),
-        Case("PSD", "② 半正定 PSD（秩亏）", M["A3"],
+        Case("PSD", "② Positive semidefinite (PSD, rank-deficient)", M["A3"],
              note="A = BᵀB，λ = {0, 2.35, 7.65}：零方向静止，其余发散；V≥0 且 V̇=2‖Ax‖²≥0"),
-        Case("UNSTABLE", "③ 不稳定（鞍点）", M["A_unstable"],
+        Case("UNSTABLE", "③ Unstable (saddle)", M["A_unstable"],
              note="diag(1,-2)：一个方向发散、一个方向收敛；V 不定、会变号"),
-        Case("RANKDEF", "④ 秩亏（列相关）", M["A_rankdef"],
+        Case("RANKDEF", "④ Rank-deficient (linearly dependent columns)", M["A_rankdef"],
              note="rank 2 < 3：λ={4.65, 0, -0.65} → 收敛/静止/发散 三种方向同时存在"),
     ]
 
@@ -311,13 +312,14 @@ def draw_row(axes, case: Case) -> None:
     plot_states(axes[2], case, ts, X)
     plot_energy(axes[3], case, ts, X)
 
-    axes[0].set_title(f"{case.title}\n特征值谱 / 谱半径（复平面 Re–Im）",
-                      fontsize=11.5, fontweight="bold", loc="left")
-    axes[1].set_title(r"二次型 $x^\top A x$ 等值线（对称部分主方向投影）", fontsize=10.5)
-    axes[2].set_title(f"状态轨迹 $x(t)$，T = {info['T']:.2f}", fontsize=10.5)
-    axes[3].set_title(r"二次型沿轨迹 $V(t)$", fontsize=10.5)
+    axes[0].set_title(f"{case.title}\nEigenvalue spectrum / spectral radius (Re–Im plane)",
+                      fontsize=11, loc="left")
+    axes[1].set_title(r"Quadratic form $x^\top A x$ contours (principal directions)",
+                      fontsize=11, loc="left")
+    axes[2].set_title(f"State trajectory $x(t)$, T = {info['T']:.2f}", fontsize=11, loc="left")
+    axes[3].set_title(r"Quadratic form along trajectory $V(t)$", fontsize=11, loc="left")
 
-    axes[0].text(0.02, 0.99, f"{info['deftype']}\n连续: {info['verdict_c']}\n离散: {info['verdict_d']}",
+    axes[0].text(0.02, 0.99, f"{info['deftype']}\ncontinuous: {info['verdict_c']}\ndiscrete: {info['verdict_d']}",
                  transform=axes[0].transAxes, va="top", ha="left", fontsize=8.5,
                  bbox=dict(fc="#fffbe6", ec="#c9a227", alpha=0.95, boxstyle="round,pad=0.35"))
 
@@ -343,13 +345,13 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="4 类矩阵的谱 / 二次型 / 轨迹可视化")
     ap.add_argument("--out", default="experiments/figures/matrix_trajectories.png",
                     help="输出图片路径（notes/week1.md 里引用的就是这个文件）")
-    ap.add_argument("--dpi", type=int, default=130)
+    ap.add_argument("--dpi", type=int, default=180)
     ap.add_argument("--show", action="store_true", help="保存后弹窗显示")
     ap.add_argument("--with-ref", action="store_true",
                     help="额外画一行稳定对照组 diag(-2,-1)")
     args = ap.parse_args()
 
-    ref = Case("REF", "⑤ 参考：对称负定（稳定）", np.diag([-2.0, -1.0]),
+    ref = Case("REF", "⑤ Reference: symmetric negative-definite (stable)", np.diag([-2.0, -1.0]),
                note="diag(-2,-1)：全负实部 → 收敛；离散判据 ρ=2>1 却发散")
     analyze(ref)
 
@@ -361,11 +363,12 @@ def main() -> None:
     for row, case in zip(axs, plotted):
         draw_row(row, case)
 
-    fig.suptitle(r"$\dot{x} = A x$ 的谱性质与状态轨迹：SPD / PSD / 不稳定 / 秩亏", fontsize=16)
+    fig.suptitle(r"Spectrum and trajectories of $\dot{x} = A x$: SPD / PSD / unstable / rank-deficient",
+                 fontsize=15)
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=args.dpi, bbox_inches="tight")
+    fig.savefig(out, dpi=args.dpi, facecolor="white", bbox_inches="tight")
 
     print_summary(cases + ([] if args.with_ref else [ref]))
     print(f"\n图已保存: {out.resolve()}")
